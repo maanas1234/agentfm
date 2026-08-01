@@ -1,9 +1,11 @@
 """Parse raw Claude Code CLI output into structured Events.
 
 Claude Code renders tool calls as `⏺ ToolName(args)`, results indented below
-with `⎿`, a spinner line like `✻ Thinking… (esc to interrupt)` while working,
-and permission prompts as numbered `❯ 1. Yes` menus. This module turns that
-text stream into Event objects.
+with `⎿`, a spinner line while working (a random whimsical verb each time --
+`✻ Fiddle-faddling… (esc to interrupt · 4s · 102 tokens)`, `✻ Thinking…`,
+etc. -- so the check matches the shape, not a fixed word list), and
+permission prompts as numbered `❯ 1. Yes` menus. This module turns that text
+stream into Event objects.
 """
 
 from __future__ import annotations
@@ -14,9 +16,7 @@ from agentfm.daemon.events import Event
 from agentfm.parsers.ansi import strip_ansi
 
 _TOOL_CALL_RE = re.compile(r"^\s*⏺\s+(?P<tool>[A-Za-z][\w]*)\((?P<args>.*)\)\s*$")
-_THINKING_RE = re.compile(
-    r"^\s*[✻✽·✢]\s*(Thinking|Pondering|Considering|Musing|Cogitating|Working)\b"
-)
+_THINKING_RE = re.compile(r"^\s*[✻✽·✢*]\s*[A-Z][\w-]*…|\(esc to interrupt")
 _WAITING_RE = re.compile(r"Do you want to proceed\?|^\s*❯\s*\d+\.")
 _ERROR_RE = re.compile(r"\b(Error|ERROR)\b:|Traceback \(most recent call last\)")
 
@@ -40,7 +40,7 @@ def parse_line(session_id: str, line: str) -> Event | None:
     if _ERROR_RE.search(clean):
         return Event(session_id=session_id, kind="error", detail=clean.strip())
 
-    if _THINKING_RE.match(clean):
+    if _THINKING_RE.search(clean):
         return Event(session_id=session_id, kind="thinking", detail=clean.strip())
 
     return None

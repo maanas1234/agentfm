@@ -51,3 +51,12 @@ def test_incremental_feed_across_chunk_boundaries():
     second = parser.feed("proceed?\n".encode())
     assert len(second) == 1
     assert second[0].kind == "waiting"
+
+
+def test_whimsical_spinner_verb_detected_as_thinking():
+    parser = ClaudeCodeParser(session_id="s1")
+    events = parser.feed(
+        "✻ Fiddle-faddling… (esc to interrupt · 4s · ↑ 102 tokens)\n".encode()
+    )
+    assert len(events) == 1
+    assert events[0].kind == "thinking"

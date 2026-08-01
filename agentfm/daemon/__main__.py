@@ -59,6 +59,7 @@ def _pump_output(
 def _tick_pipeline(session: PtySession, pipeline: NarrationPipeline) -> None:
     while session.isalive():
         time.sleep(1.0)
+        session.sync_winsize()
         pipeline.check_timeouts(time.time())
 
 

@@ -6,6 +6,7 @@ rest of the daemon never branches on platform.
 
 from __future__ import annotations
 
+import shutil
 import sys
 
 
@@ -20,6 +21,24 @@ class PtySession:
             import ptyprocess
 
             self._proc = ptyprocess.PtyProcess.spawn(cmd)
+
+        self._last_size: tuple[int, int] | None = None
+        self.sync_winsize()
+
+    def sync_winsize(self) -> None:
+        """Match the PTY's size to our own host terminal. Without this the
+        child's TUI redraws assuming whatever default size the PTY library
+        picked (commonly 80x24), producing corrupted/overlapping output
+        whenever the real terminal is a different size."""
+        cols, rows = shutil.get_terminal_size(fallback=(80, 24))
+        size = (rows, cols)
+        if size == self._last_size:
+            return
+        try:
+            self._proc.setwinsize(rows, cols)
+        except Exception:
+            return
+        self._last_size = size
 
     def read(self, size: int = 4096) -> bytes:
         try:
