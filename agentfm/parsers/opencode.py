@@ -14,6 +14,7 @@ import re
 
 from agentfm.daemon.events import Event
 from agentfm.parsers.ansi import strip_ansi
+from agentfm.parsers.base import LineBufferedParser
 
 _BULLET_RE = re.compile(r"^\s*[•▸]\s*(?P<verb>[A-Za-z][\w]*)\b(?P<rest>.*)$")
 _THINKING_RE = re.compile(
@@ -48,19 +49,6 @@ def parse_line(session_id: str, line: str) -> Event | None:
     return None
 
 
-class OpenCodeParser:
-    """Stateful line-buffering parser: feed raw PTY bytes, get back Events."""
-
+class OpenCodeParser(LineBufferedParser):
     def __init__(self, session_id: str):
-        self.session_id = session_id
-        self._buffer = ""
-
-    def feed(self, data: bytes) -> list[Event]:
-        self._buffer += data.decode("utf-8", errors="replace")
-        events: list[Event] = []
-        while "\n" in self._buffer:
-            line, self._buffer = self._buffer.split("\n", 1)
-            event = parse_line(self.session_id, line)
-            if event is not None:
-                events.append(event)
-        return events
+        super().__init__(session_id, parse_line)

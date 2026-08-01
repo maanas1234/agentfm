@@ -1,13 +1,16 @@
-✻ Thinking… (esc to interrupt)
+✻ Fiddle-faddling… (esc to interrupt)
 
-⏺ Read(agentfm/daemon/__main__.py)
+● Reading agentfm/daemon/__main__.py…
   ⎿  Read 92 lines
 
-⏺ Edit(agentfm/daemon/pty_wrapper.py)
+● Writing agentfm/daemon/pty_wrapper.py…
   ⎿  Updated 1 file
 
-⏺ Bash(npm test)
-  ⎿  Error: 3 failing tests
+● Running 1 shell command…
+  ⎿  $ npm test
+
+● Exit 1, npm test: 3 failing tests
+✻ Brewed for 4s
 
 Do you want to proceed?
 ❯ 1. Yes

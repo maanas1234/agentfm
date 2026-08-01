@@ -1,11 +1,13 @@
 """Parse raw Claude Code CLI output into structured Events.
 
-Claude Code renders tool calls as `⏺ ToolName(args)`, results indented below
-with `⎿`, a spinner line while working (a random whimsical verb each time --
-`✻ Fiddle-faddling… (esc to interrupt · 4s · 102 tokens)`, `✻ Thinking…`,
-etc. -- so the check matches the shape, not a fixed word list), and
-permission prompts as numbered `❯ 1. Yes` menus. This module turns that text
-stream into Event objects.
+Patterns here are based on a real captured session log (not guesswork):
+Claude Code marks both in-progress tool calls and its own settled text
+replies with `●` (`● Reading 1 file…`, `● agentfm: ...`), reports
+failed commands as `● Exit <code>, ...`, shows a spinner while working with
+a random whimsical verb each time (`✳ Fiddle-faddling… (esc to interrupt)`,
+settling to `✳ Brewed for 12s` once done), and echoes the composed prompt
+with a `❯` prefix (not a numbered permission menu, which uses `❯ 1. Yes`
+same-line style).
 """
 
 from __future__ import annotations
@@ -14,51 +16,43 @@ import re
 
 from agentfm.daemon.events import Event
 from agentfm.parsers.ansi import strip_ansi
+from agentfm.parsers.base import LineBufferedParser
 
-_TOOL_CALL_RE = re.compile(r"^\s*⏺\s+(?P<tool>[A-Za-z][\w]*)\((?P<args>.*)\)\s*$")
-_THINKING_RE = re.compile(r"^\s*[✻✽·✢*]\s*[A-Z][\w-]*…|\(esc to interrupt")
+_BULLET_RE = re.compile(r"^\s*●\s*(?P<verb>[A-Z][a-zA-Z]*ing)\b(?P<rest>.*)$")
+_EXIT_ERROR_RE = re.compile(r"^\s*●\s*Exit\s+\d+\s*,")
+_THINKING_RE = re.compile(r"^\s*[✢✳✶✻✽·⠂⠐]\s*[A-Z]")
 _WAITING_RE = re.compile(r"Do you want to proceed\?|^\s*❯\s*\d+\.")
 _ERROR_RE = re.compile(r"\b(Error|ERROR)\b:|Traceback \(most recent call last\)")
 
-_EDIT_TOOLS = {"Edit", "Write", "NotebookEdit"}
+_EDIT_VERBS = {"Writing", "Editing", "Applying"}
 
 
 def parse_line(session_id: str, line: str) -> Event | None:
-    clean = strip_ansi(line).rstrip("\r\n")
-    if not clean.strip():
+    clean = strip_ansi(line).rstrip("\r\n").strip()
+    if not clean:
         return None
 
-    match = _TOOL_CALL_RE.match(clean)
+    if _EXIT_ERROR_RE.match(clean):
+        return Event(session_id=session_id, kind="error", detail=clean)
+
+    match = _BULLET_RE.match(clean)
     if match:
-        tool = match.group("tool")
-        kind = "edit" if tool in _EDIT_TOOLS else "tool_call"
-        return Event(session_id=session_id, kind=kind, detail=clean.strip())
+        verb = match.group("verb")
+        kind = "edit" if verb in _EDIT_VERBS else "tool_call"
+        return Event(session_id=session_id, kind=kind, detail=clean)
 
     if _WAITING_RE.search(clean):
-        return Event(session_id=session_id, kind="waiting", detail=clean.strip())
+        return Event(session_id=session_id, kind="waiting", detail=clean)
 
     if _ERROR_RE.search(clean):
-        return Event(session_id=session_id, kind="error", detail=clean.strip())
+        return Event(session_id=session_id, kind="error", detail=clean)
 
-    if _THINKING_RE.search(clean):
-        return Event(session_id=session_id, kind="thinking", detail=clean.strip())
+    if _THINKING_RE.match(clean):
+        return Event(session_id=session_id, kind="thinking", detail=clean)
 
     return None
 
 
-class ClaudeCodeParser:
-    """Stateful line-buffering parser: feed raw PTY bytes, get back Events."""
-
+class ClaudeCodeParser(LineBufferedParser):
     def __init__(self, session_id: str):
-        self.session_id = session_id
-        self._buffer = ""
-
-    def feed(self, data: bytes) -> list[Event]:
-        self._buffer += data.decode("utf-8", errors="replace")
-        events: list[Event] = []
-        while "\n" in self._buffer:
-            line, self._buffer = self._buffer.split("\n", 1)
-            event = parse_line(self.session_id, line)
-            if event is not None:
-                events.append(event)
-        return events
+        super().__init__(session_id, parse_line)
