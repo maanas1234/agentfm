@@ -1,3 +1,4 @@
+import json
 import sys
 import types
 
@@ -40,6 +41,48 @@ async def test_synthesize_posts_to_byok_endpoint_and_returns_audio_bytes():
 async def test_synthesize_returns_empty_bytes_for_empty_text():
     config = TTSConfig(enabled=True, base_url="https://x", api_key="k")
     assert await synthesize(config, "") == b""
+
+
+@pytest.mark.asyncio
+async def test_synthesize_uses_configured_model_and_omits_voice_when_unset():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, content=b"AUDIO")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    config = TTSConfig(
+        enabled=True,
+        base_url="https://x",
+        api_key="k",
+        model="gemini-2.5-flash-preview-tts",
+    )
+
+    await synthesize(config, "hi", client=client)
+
+    assert captured["body"]["model"] == "gemini-2.5-flash-preview-tts"
+    assert "voice" not in captured["body"]
+
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_synthesize_includes_voice_when_configured():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, content=b"AUDIO")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    config = TTSConfig(enabled=True, base_url="https://x", api_key="k", voice="nova")
+
+    await synthesize(config, "hi", client=client)
+
+    assert captured["body"]["voice"] == "nova"
+
+    await client.aclose()
 
 
 def test_speak_local_uses_pyttsx3_engine(monkeypatch):

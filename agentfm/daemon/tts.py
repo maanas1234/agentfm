@@ -22,7 +22,9 @@ async def synthesize(
     if not text:
         return b""
 
-    payload = {"model": "tts-1", "input": text, "voice": config.voice or "alloy"}
+    payload = {"model": config.model, "input": text}
+    if config.voice:
+        payload["voice"] = config.voice
     headers = {"Authorization": f"Bearer {config.api_key}"}
     url = f"{config.base_url.rstrip('/')}/audio/speech"
 

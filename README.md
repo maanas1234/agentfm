@@ -25,7 +25,8 @@ model = "your-model"
 enabled = true                           # omit/false -> falls back to local OS voice
 base_url = "https://your-provider/v1"    # OpenAI-compatible /audio/speech
 api_key = "sk-..."
-voice = "nova"
+model = "tts-1"                          # e.g. "gemini-2.5-flash-preview-tts" on some proxies
+voice = "nova"                            # optional -- omitted from the request if unset
 ```
 
 If `[llm]` isn't configured, agentfm still passes your terminal through and

@@ -26,6 +26,7 @@ class TTSConfig:
     enabled: bool = False
     base_url: str = ""
     api_key: str = ""
+    model: str = "tts-1"
     voice: str = ""
 
 
@@ -36,7 +37,7 @@ class AppConfig:
 
 
 _LLM_FIELDS = {"base_url", "api_key", "model"}
-_TTS_FIELDS = {"enabled", "base_url", "api_key", "voice"}
+_TTS_FIELDS = {"enabled", "base_url", "api_key", "model", "voice"}
 
 
 def load_config(path: Path = CONFIG_PATH) -> AppConfig:
