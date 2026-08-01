@@ -5,7 +5,12 @@ import pytest
 
 from agentfm.daemon.config import LLMConfig
 from agentfm.daemon.events import Event
-from agentfm.daemon.narrator import EventBatcher, Narrator, build_digest
+from agentfm.daemon.narrator import (
+    EventBatcher,
+    Narrator,
+    build_digest,
+    looks_like_leaked_reasoning,
+)
 
 
 def _event(kind: str, detail: str, ts: float) -> Event:
@@ -67,7 +72,7 @@ async def test_narrator_summarize_calls_configured_endpoint_with_byok_key():
     assert captured["url"] == "https://my-provider.example/v1/chat/completions"
     assert captured["auth"] == "Bearer secret-key"
     assert captured["body"]["model"] == "my-model"
-    assert "Read(foo.py)" in captured["body"]["messages"][1]["content"]
+    assert "Read(foo.py)" in captured["body"]["messages"][-1]["content"]
 
     await client.aclose()
 
@@ -77,3 +82,60 @@ async def test_narrator_summarize_returns_empty_string_for_no_events():
     config = LLMConfig(base_url="https://x", api_key="k", model="m")
     narrator = Narrator(config=config)
     assert await narrator.summarize([]) == ""
+
+
+def test_looks_like_leaked_reasoning_flags_oversized_text():
+    assert looks_like_leaked_reasoning("The agent reads foo.py.") is False
+    assert looks_like_leaked_reasoning("x" * 300) is True
+
+
+def test_looks_like_leaked_reasoning_flags_giveaway_phrases():
+    assert looks_like_leaked_reasoning("Let's count: The(1) agent(2)...") is True
+    assert looks_like_leaked_reasoning("As a radio announcer would say...") is True
+
+
+@pytest.mark.asyncio
+async def test_narrator_retries_once_then_falls_back_on_leaked_reasoning():
+    call_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal call_count
+        call_count += 1
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "Let's count the words. " * 20}}]},
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    config = LLMConfig(base_url="https://x", api_key="k", model="m")
+    narrator = Narrator(config=config, client=client)
+
+    result = await narrator.summarize([_event("error", "Exit 127, boom", 1.0)])
+
+    assert call_count == 2
+    assert result == "[error] Exit 127, boom"
+
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_narrator_accepts_clean_response_on_retry():
+    responses = iter(
+        [
+            {"choices": [{"message": {"content": "Let's count the words. " * 20}}]},
+            {"choices": [{"message": {"content": "The agent hits an error."}}]},
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=next(responses))
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    config = LLMConfig(base_url="https://x", api_key="k", model="m")
+    narrator = Narrator(config=config, client=client)
+
+    result = await narrator.summarize([_event("error", "Exit 127, boom", 1.0)])
+
+    assert result == "The agent hits an error."
+
+    await client.aclose()

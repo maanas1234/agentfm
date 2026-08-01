@@ -20,9 +20,32 @@ _SYSTEM_PROMPT = (
     "or preamble like 'Here's the narration:'. Just the sentence."
 )
 
+_EXAMPLE_EVENTS = "[tool_call] ● Reading foo.py…"
+_EXAMPLE_NARRATION = "The agent reads foo.py."
+
+MAX_NARRATION_CHARS = 220
+
 
 def build_digest(events: list[Event]) -> str:
     return "\n".join(f"[{e.kind}] {e.detail}" for e in events)
+
+
+def looks_like_leaked_reasoning(text: str) -> bool:
+    """Some reasoning models occasionally narrate their own interpretation of
+    the system prompt instead of following it -- a multi-paragraph dump full
+    of word-counting and self-quoted instructions instead of one sentence.
+    TTS would read that whole thing aloud, so catch it before it gets there."""
+    if len(text) > MAX_NARRATION_CHARS:
+        return True
+    lowered = text.lower()
+    return any(
+        marker in lowered
+        for marker in ("let's count", "radio announcer", "the instruction:", "constraints:")
+    )
+
+
+def _fallback_narration(events: list[Event]) -> str:
+    return build_digest(events[-1:])
 
 
 class EventBatcher:
@@ -62,10 +85,28 @@ class Narrator:
         if not events:
             return ""
 
+        client = self._client
+        owns_client = client is None
+        if owns_client:
+            client = httpx.AsyncClient()
+        try:
+            text = await self._call(events, client)
+            if looks_like_leaked_reasoning(text):
+                text = await self._call(events, client)
+            if looks_like_leaked_reasoning(text):
+                text = _fallback_narration(events)
+            return text
+        finally:
+            if owns_client:
+                await client.aclose()
+
+    async def _call(self, events: list[Event], client: httpx.AsyncClient) -> str:
         payload = {
             "model": self.config.model,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "user", "content": _EXAMPLE_EVENTS},
+                {"role": "assistant", "content": _EXAMPLE_NARRATION},
                 {"role": "user", "content": build_digest(events)},
             ],
             "max_tokens": 300,
@@ -73,15 +114,7 @@ class Narrator:
         headers = {"Authorization": f"Bearer {self.config.api_key}"}
         url = f"{self.config.base_url.rstrip('/')}/chat/completions"
 
-        client = self._client
-        owns_client = client is None
-        if owns_client:
-            client = httpx.AsyncClient()
-        try:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-            return data["choices"][0]["message"]["content"].strip()
-        finally:
-            if owns_client:
-                await client.aclose()
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
