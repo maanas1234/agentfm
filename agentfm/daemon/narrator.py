@@ -14,8 +14,10 @@ DEBOUNCE_SECONDS = 7.0
 IMMEDIATE_KINDS = {"waiting", "error"}
 
 _SYSTEM_PROMPT = (
-    "You narrate an AI coding agent's activity in one short spoken sentence. "
-    "Be concise and present-tense."
+    "Narrate an AI coding agent's activity for a listener, as a radio announcer would. "
+    "Output ONLY the spoken sentence itself — one sentence, present-tense, under 15 words. "
+    "Do not explain your reasoning, do not restate these instructions, do not use quotes "
+    "or preamble like 'Here's the narration:'. Just the sentence."
 )
 
 
@@ -66,7 +68,7 @@ class Narrator:
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": build_digest(events)},
             ],
-            "max_tokens": 80,
+            "max_tokens": 300,
         }
         headers = {"Authorization": f"Bearer {self.config.api_key}"}
         url = f"{self.config.base_url.rstrip('/')}/chat/completions"

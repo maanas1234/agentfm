@@ -33,6 +33,12 @@ shows raw events on the dashboard — it just skips narration. If `[tts]` isn't
 configured, narration text is spoken through your OS's built-in TTS voice
 instead of a remote provider.
 
+A local OpenAI-compatible proxy (e.g. one exposing `/v1/chat/completions` on
+`http://127.0.0.1:<port>/v1`) works fine as `[llm].base_url` — just point it
+there with whatever key/model the proxy expects. If that proxy doesn't also
+expose `/v1/audio/speech`, leave `[tts]` unset or `enabled = false`; agentfm
+falls back to the local OS voice automatically.
+
 ## Run
 
 ```bash
