@@ -4,6 +4,8 @@ configured, otherwise a local OS-voice fallback that needs no key at all.
 
 from __future__ import annotations
 
+import sys
+
 import httpx
 
 from agentfm.daemon.config import TTSConfig
@@ -37,9 +39,28 @@ async def synthesize(
 
 
 def speak_local(text: str) -> None:
-    """No-key fallback: speaks through the OS's built-in TTS voice."""
+    """No-key fallback: speaks through the OS's built-in TTS voice.
+
+    Runs on a worker thread via run_in_executor. pyttsx3's SAPI5 backend on
+    Windows goes through comtypes, which requires COM to be initialized on
+    whichever thread calls it -- worker threads never do that by default.
+    """
     if not text:
         return
+
+    if sys.platform == "win32":
+        import pythoncom
+
+        pythoncom.CoInitialize()
+        try:
+            _speak(text)
+        finally:
+            pythoncom.CoUninitialize()
+    else:
+        _speak(text)
+
+
+def _speak(text: str) -> None:
     import pyttsx3
 
     engine = pyttsx3.init()

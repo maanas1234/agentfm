@@ -79,8 +79,18 @@ def _pump_input_windows(session: PtySession) -> None:
     import msvcrt
 
     while session.isalive():
+        if not msvcrt.kbhit():
+            time.sleep(0.02)
+            continue
         ch = msvcrt.getwch()
         session.write(ch.encode("utf-8", errors="replace"))
+
+
+def _wait_no_input(session: PtySession) -> None:
+    """No real TTY attached to our own stdin (piped/CI/background run) --
+    nothing to forward, just block until the wrapped session exits."""
+    while session.isalive():
+        time.sleep(0.1)
 
 
 def main() -> None:
@@ -126,7 +136,9 @@ def main() -> None:
             )
             ticker_thread.start()
 
-            if sys.platform == "win32":
+            if not sys.stdin.isatty():
+                _wait_no_input(session)
+            elif sys.platform == "win32":
                 _pump_input_windows(session)
             else:
                 _pump_input_unix(session)

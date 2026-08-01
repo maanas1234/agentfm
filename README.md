@@ -56,6 +56,15 @@ Flags:
 - `--no-server` — skip the dashboard, just tee raw output to
   `~/.agentfm/logs/<session_id>.log`
 
+### Known limitation (Windows)
+
+On Windows, `pywinpty`/ConPTY can take several seconds (observed 8-12s in
+testing, even for trivial scripts) to notice that the wrapped process has
+exited — `agentfm run` will keep running briefly after the CLI it wraps has
+already quit. This is a ConPTY-level delay, not something agentfm's polling
+loop controls. Hasn't been checked against real `claude`/`codex` binaries yet
+(only tested against a mock Python script) — could behave differently there.
+
 ## Architecture
 
 ```

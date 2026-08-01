@@ -63,3 +63,22 @@ def test_speak_local_noop_for_empty_text(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "pyttsx3", types.SimpleNamespace(init=_fail_init))
     speak_local("")
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="COM init is Windows-only")
+def test_speak_local_initializes_com_on_windows(monkeypatch):
+    calls = []
+
+    fake_engine = types.SimpleNamespace(say=lambda text: None, runAndWait=lambda: None)
+    monkeypatch.setitem(
+        sys.modules, "pyttsx3", types.SimpleNamespace(init=lambda: fake_engine)
+    )
+    fake_pythoncom = types.SimpleNamespace(
+        CoInitialize=lambda: calls.append("init"),
+        CoUninitialize=lambda: calls.append("uninit"),
+    )
+    monkeypatch.setitem(sys.modules, "pythoncom", fake_pythoncom)
+
+    speak_local("Agent is done.")
+
+    assert calls == ["init", "uninit"]

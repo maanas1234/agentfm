@@ -12,6 +12,7 @@ dependencies = [
     "tomli>=2.0; python_version < '3.11'",
     "pyttsx3>=2.90",
     "pywinpty>=2.0; sys_platform == 'win32'",
+    "pywin32>=305; sys_platform == 'win32'",
     "ptyprocess>=0.7; sys_platform != 'win32'",
 ]
 
