@@ -20,21 +20,26 @@ from agentfm.daemon.pty_wrapper import PtySession
 from agentfm.daemon.server import broadcaster, start_server_in_thread
 from agentfm.parsers.claude_code import ClaudeCodeParser
 from agentfm.parsers.codex import CodexParser
+from agentfm.parsers.opencode import OpenCodeParser
 
 LOG_DIR = Path.home() / ".agentfm" / "logs"
 
+_ParserT = ClaudeCodeParser | CodexParser | OpenCodeParser
 
-def _select_parser(cmd: list[str], session_id: str) -> ClaudeCodeParser | CodexParser:
+
+def _select_parser(cmd: list[str], session_id: str) -> _ParserT:
     exe = Path(cmd[0]).stem.lower()
     if exe == "codex":
         return CodexParser(session_id=session_id)
+    if exe == "opencode":
+        return OpenCodeParser(session_id=session_id)
     return ClaudeCodeParser(session_id=session_id)
 
 
 def _pump_output(
     session: PtySession,
     log_file,
-    parser: ClaudeCodeParser | CodexParser,
+    parser: _ParserT,
     pipeline: NarrationPipeline,
 ) -> None:
     while session.isalive():

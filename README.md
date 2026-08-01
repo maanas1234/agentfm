@@ -44,6 +44,7 @@ falls back to the local OS voice automatically.
 ```bash
 agentfm run -- claude
 agentfm run -- codex
+agentfm run -- opencode
 ```
 
 This starts a local dashboard (default `http://127.0.0.1:8765`) and passes
@@ -80,6 +81,7 @@ agentfm/
   parsers/
     claude_code.py    # Claude Code CLI output -> Events
     codex.py          # Codex CLI output -> Events
+    opencode.py       # OpenCode CLI output -> Events (best-effort, unverified)
   web/                # static dashboard (vanilla JS, no build step)
 ```
 
