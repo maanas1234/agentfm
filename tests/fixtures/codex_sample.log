@@ -1,0 +1,10 @@
+⠋ Codex is thinking...
+
+• Reading agentfm/daemon/__main__.py
+
+• Editing agentfm/daemon/pty_wrapper.py
+
+• Running command: npm test
+Error: 3 failing tests
+
+Allow this command? (y/n)
