@@ -50,6 +50,7 @@ def test_pipeline_narrates_immediately_on_waiting_event_with_remote_tts(monkeypa
     assert message["session_id"] == "s1"
     assert message["text"] == "Agent is waiting for approval."
     assert base64.b64decode(message["audio_b64"]) == b"FAKE_AUDIO"
+    assert message["audio_mime"] == "audio/mpeg"
 
 
 def test_pipeline_speaks_locally_when_no_remote_tts_configured(monkeypatch):

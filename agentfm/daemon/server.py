@@ -24,6 +24,21 @@ from agentfm.daemon.events import Event
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
+def detect_audio_mime(data: bytes) -> str:
+    """BYOK TTS backends return different formats -- OpenAI's is mp3, but
+    e.g. a Gemini-backed proxy returns WAV. A browser `Audio()` element
+    given a data: URI with the wrong declared MIME type for the actual bytes
+    typically fails to decode silently (onerror fires, nothing plays, no
+    visible error) -- so this has to match reality, not assume mp3."""
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return "audio/wav"
+    if data[:3] == b"ID3" or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "audio/mpeg"
+    if data[:4] == b"OggS":
+        return "audio/ogg"
+    return "audio/mpeg"
+
+
 class Broadcaster:
     def __init__(self) -> None:
         self.connections: set[WebSocket] = set()
@@ -71,6 +86,7 @@ class Broadcaster:
                 "session_id": session_id,
                 "text": text,
                 "audio_b64": base64.b64encode(audio).decode("ascii") if audio else None,
+                "audio_mime": detect_audio_mime(audio) if audio else None,
             }
         )
         await self._broadcast(payload)

@@ -6,9 +6,9 @@ export class AudioQueue {
     this.onStatusChange = onStatusChange || (() => {});
   }
 
-  enqueue(base64) {
+  enqueue(base64, mime) {
     if (!base64) return;
-    this.queue.push(base64);
+    this.queue.push({ base64, mime: mime || "audio/mpeg" });
     this._notify();
     if (!this.playing) this._playNext();
   }
@@ -24,7 +24,7 @@ export class AudioQueue {
       return;
     }
     this.playing = true;
-    const base64 = this.queue.shift();
+    const { base64, mime } = this.queue.shift();
     this._notify();
 
     if (this.muted) {
@@ -32,7 +32,7 @@ export class AudioQueue {
       return;
     }
 
-    const audio = new Audio(`data:audio/mpeg;base64,${base64}`);
+    const audio = new Audio(`data:${mime};base64,${base64}`);
     audio.onended = () => this._playNext();
     audio.onerror = () => this._playNext();
     audio.play().catch(() => this._playNext());

@@ -29,7 +29,7 @@ function handleMessage(msg) {
   } else if (msg.type === "narration") {
     const s = ensureSession(msg.session_id);
     s.events.push({ kind: "narration", text: msg.text, ts: Date.now() / 1000 });
-    if (msg.audio_b64) audioQueue.enqueue(msg.audio_b64);
+    if (msg.audio_b64) audioQueue.enqueue(msg.audio_b64, msg.audio_mime);
   }
   render();
 }
